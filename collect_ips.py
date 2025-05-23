@@ -6,7 +6,9 @@ import os
 # 所有要抓取的 URL 列表（全部改为 http 或 https 正确形式）
 urls = [
     'http://monitor.gacjie.cn/page/cloudflare/ipv4.html',
-    'http://ip.164746.xyz'
+    'http://ip.164746.xyz',
+    'https://cf.090227.xyz',
+    'https://stock.hostmonit.com/CloudFlareYes'
 ]
 
 # 正则匹配 IPv4
