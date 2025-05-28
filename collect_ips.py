@@ -47,7 +47,7 @@ def test_ip(ip):
         start = time.time()
         with socket.create_connection((ip, 443), timeout=2):
             latency = (time.time() - start) * 1000  # 毫秒
-            if latency >= 150:
+            if latency >=0:
                 return ip, latency
     except:
         return None
