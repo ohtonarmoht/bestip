@@ -4,8 +4,8 @@ import re
 import os
 
 # 目标URL列表
-urls = ['https://monitor.gacjie.cn/page/cloudflare/ipv4.html', 
-        'https://ip.164746.xyz'
+urls = ['http://monitor.gacjie.cn/page/cloudflare/ipv4.html', 
+        'http://ip.164746.xyz'
         ]
 
 # 正则表达式用于匹配IP地址
