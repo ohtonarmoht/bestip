@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
+# 待抓取的 URL
 urls = [
     'http://monitor.gacjie.cn/page/cloudflare/ipv4.html',
     'http://ip.164746.xyz',
@@ -16,19 +17,20 @@ urls = [
 
 ip_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
 
+# 清除旧文件
 if os.path.exists('ip.txt'):
     os.remove('ip.txt')
 
 all_ips = set()
 
-# 抓取 IP 阶段
+# 第一步：抓取 IP
 for url in urls:
     try:
         print(f"正在抓取：{url}")
         response = requests.get(url, timeout=10)
         response.raise_for_status()
     except Exception as e:
-        print(f"访问 {url} 失败：{e}")
+        print(f"❌ 无法访问 {url}：{e}")
         continue
 
     soup = BeautifulSoup(response.text, 'html.parser')
@@ -39,13 +41,13 @@ for url in urls:
         ip_matches = re.findall(ip_pattern, text)
         all_ips.update(ip_matches)
 
-print(f"抓取并去重后共获得 {len(all_ips)} 个唯一 IP。")
+print(f"\n✅ 共抓取并去重出 {len(all_ips)} 个唯一 IP，开始测试...\n")
 
-# 使用真实 HTTP 请求测试 IP 延迟
+# 第二步：测试 IP 是否支持访问并测延迟
 def test_ip(ip):
     test_url = f"https://{ip}/generate_204"
     headers = {
-        "Host": "www.gstatic.com"
+        "Host": "cp.cloudflare.com"
     }
     try:
         start = time.time()
@@ -53,14 +55,11 @@ def test_ip(ip):
         latency = (time.time() - start) * 1000
         if response.status_code == 204 and latency >= 150:
             return ip, latency
-        else:
-            print(f"{ip} ❌ 状态码 {response.status_code} 或延迟 {latency:.2f} ms 过低")
-    except Exception as e:
-        print(f"{ip} ❌ 请求失败：{e}")
+    except:
+        pass
     return None
 
-print("正在多线程真实请求测试 IP（保留延迟 ≥150ms 的）...")
-
+# 使用线程池加速
 valid_ips = []
 with ThreadPoolExecutor(max_workers=50) as executor:
     futures = {executor.submit(test_ip, ip): ip for ip in all_ips}
@@ -68,13 +67,15 @@ with ThreadPoolExecutor(max_workers=50) as executor:
         result = future.result()
         if result:
             ip, latency = result
-            print(f"{ip} ✅ 延迟 {latency:.2f} ms")
+            print(f"✅ {ip} 响应正常，延迟 {latency:.2f}ms")
             valid_ips.append((ip, latency))
+        else:
+            ip = futures[future]
+            print(f"❌ {ip} 无法使用或延迟过低")
 
-valid_ips.sort(key=lambda x: x[1])
-
+# 保存结果
 with open('ip.txt', 'w') as f:
     for ip, latency in valid_ips:
-        f.write(f"{ip}  # {latency:.2f} ms\n")
+        f.write(f"{ip}  # 延迟: {latency:.2f}ms\n")
 
-print(f"\n✅ 已保存 {len(valid_ips)} 个可用 IP（真实请求，延迟 ≥150ms）到 ip.txt。")
+print(f"\n🎉 测试完成，共保留 {len(valid_ips)} 个可用 IP，已写入 ip.txt")
