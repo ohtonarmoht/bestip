@@ -2,11 +2,11 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import os
-import socket
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib3.exceptions import InsecureRequestWarning
+requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
-# 所有要抓取的 URL 列表
 urls = [
     'http://monitor.gacjie.cn/page/cloudflare/ipv4.html',
     'http://ip.164746.xyz',
@@ -41,39 +41,40 @@ for url in urls:
 
 print(f"抓取并去重后共获得 {len(all_ips)} 个唯一 IP。")
 
-# 测试函数，只返回延迟 ≥150ms 的 IP
+# 使用真实 HTTP 请求测试 IP 延迟
 def test_ip(ip):
+    test_url = f"https://{ip}/generate_204"
+    headers = {
+        "Host": "www.gstatic.com"
+    }
     try:
         start = time.time()
-        with socket.create_connection((ip, 443), timeout=2):
-            latency = (time.time() - start) * 1000  # 毫秒
-            if latency >=0:
-                return ip, latency
-    except:
-        return None
+        response = requests.get(test_url, headers=headers, timeout=3, verify=False)
+        latency = (time.time() - start) * 1000
+        if response.status_code == 204 and latency >= 150:
+            return ip, latency
+        else:
+            print(f"{ip} ❌ 状态码 {response.status_code} 或延迟 {latency:.2f} ms 过低")
+    except Exception as e:
+        print(f"{ip} ❌ 请求失败：{e}")
     return None
 
-print("正在多线程测试 IP 连通性与延迟（只保留延迟 ≥150ms 的 IP）...")
+print("正在多线程真实请求测试 IP（保留延迟 ≥150ms 的）...")
 
 valid_ips = []
 with ThreadPoolExecutor(max_workers=50) as executor:
     futures = {executor.submit(test_ip, ip): ip for ip in all_ips}
     for future in as_completed(futures):
         result = future.result()
-        ip = futures[future]
         if result:
             ip, latency = result
             print(f"{ip} ✅ 延迟 {latency:.2f} ms")
             valid_ips.append((ip, latency))
-        else:
-            print(f"{ip} ❌ 不可用或延迟过低")
 
-# 排序
 valid_ips.sort(key=lambda x: x[1])
 
-# 保存结果
 with open('ip.txt', 'w') as f:
     for ip, latency in valid_ips:
         f.write(f"{ip}  # {latency:.2f} ms\n")
 
-print(f"\n✅ 已保存 {len(valid_ips)} 个可用 IP（延迟 ≥150ms）到 ip.txt。")
+print(f"\n✅ 已保存 {len(valid_ips)} 个可用 IP（真实请求，延迟 ≥150ms）到 ip.txt。")
